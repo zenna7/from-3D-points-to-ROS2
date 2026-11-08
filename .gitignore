@@ -1,0 +1,6 @@
+frames/
+reconstruction.ply
+initial_test/
+.vscode/
+.DS_Store
+
