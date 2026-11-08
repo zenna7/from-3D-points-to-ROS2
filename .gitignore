@@ -1,6 +1,9 @@
 frames/
-reconstruction.ply
 initial_test/
 .vscode/
 .DS_Store
-
+build/
+install/
+log/
+__pycache__/
+*.ply
