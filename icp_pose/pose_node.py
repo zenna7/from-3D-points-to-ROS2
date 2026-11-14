@@ -53,7 +53,12 @@ class PoseNode(Node):
             self.tgt = src
             return
 
-        res = register(src, self.tgt)
+        try:
+            res = register(src, self.tgt)
+        except RuntimeError:
+            self.get_logger().info("skipped (no correspondences)")
+            return
+        
         if res.fitness < CONFIG["min_fitness"]:
             self.get_logger().info(f"skipped (fitness {res.fitness:.3f})")
             return
