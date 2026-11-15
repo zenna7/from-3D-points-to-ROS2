@@ -8,6 +8,12 @@ from rclpy.node import Node
 from scipy.spatial.transform import Rotation
 from sensor_msgs.msg import PointCloud2
 
+import matplotlib
+matplotlib.use("TkAgg")
+import matplotlib.pyplot as plt
+
+
+
 CONFIG = {
     "pre_voxel": 0.01,    # m, first downsampling of every incoming cloud
     "max_depth": 4.0,     # m, farther points are too noisy
@@ -44,6 +50,7 @@ def register(src, tgt, init):
     return res
 
 
+
 class PoseNode(Node):
     def __init__(self):
         super().__init__("pose_node")
@@ -52,12 +59,41 @@ class PoseNode(Node):
         self.step = np.eye(4)   # last frame-to-frame motion, used as starting guess
         self.tgt = None
         self.started = False
+        self.path = [np.zeros(3)]    # camera positions, starting at the origin
+        plt.ion()
+        self.ax = plt.figure("camera path").add_subplot(projection="3d")
+        self.ax.set_xlabel("x (right)")
+        self.ax.set_ylabel("y (down)")
+        self.ax.set_zlabel("z (forward)")
+        self.ax.set_box_aspect((1, 1, 1))
+        self.ax.scatter(0, 0, 0, color="black")    # starting position
+        self.line, = self.ax.plot([], [], [], color="tab:blue")
+        self.arrow = None
+        self.create_timer(0.1, self.draw)    # redraw 10 times a second
         threading.Thread(target=self.wait_for_key, daemon=True).start()
+
 
     def wait_for_key(self):
         input("Waiting for key: place the camera, then press Enter to start\n")
         self.started = True
         self.get_logger().info("tracking started")
+
+
+    def draw(self):
+        p = np.array(self.path)
+        self.line.set_data_3d(p[:, 0], p[:, 1], p[:, 2])
+
+        if self.arrow:
+            self.arrow.remove()
+        d = self.pose[:3, :3] @ [0, 0, 1]    # where the camera is pointing
+        self.arrow = self.ax.quiver(*p[-1], *d, length=0.1, normalize=True, color="tab:red")
+
+        lim = max(0.5, np.abs(p).max() * 1.1)    # grows when the path leaves the box
+        self.ax.set_xlim(-lim, lim)
+        self.ax.set_ylim(-lim, lim)
+        self.ax.set_zlim(-lim, lim)
+        plt.pause(0.001)
+
 
     def cb(self, msg):
         if not self.started:
@@ -85,6 +121,7 @@ class PoseNode(Node):
 
         self.step = res.transformation
         self.pose = self.pose @ self.step
+        self.path.append(self.pose[:3, 3].copy())
         self.tgt = src
 
         x, y, z = self.pose[:3, 3]
@@ -94,6 +131,8 @@ class PoseNode(Node):
             f"fitness {res.fitness:.3f} rmse {res.inlier_rmse:.4f} | "
             f"T = ({x:.3f}, {y:.3f}, {z:.3f}) m | "
             f"theta = ({a1:.1f}, {a2:.1f}, {a3:.1f}) deg | {ms:.0f} ms")
+
+
 
 
 def main():
