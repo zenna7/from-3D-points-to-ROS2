@@ -6,7 +6,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import PointCloud2, PointField
 
 
-CONFIG = {"width": 640, "height": 480, "fps": 30, "publish_every": 6, "show_window": False}  # 30 fps / 6 = 5 Hz
+CONFIG = {"width": 640, "height": 480, "fps": 30, "publish_every": 6, "debug": False}  # 30 fps / 6 = 5 Hz
 
 
 class CameraNode(Node):
@@ -17,7 +17,9 @@ class CameraNode(Node):
         w, h, fps = CONFIG["width"], CONFIG["height"], CONFIG["fps"]
         cfg = rs.config()
         cfg.enable_stream(rs.stream.depth, w, h, rs.format.z16, fps)
-        cfg.enable_stream(rs.stream.color, w, h, rs.format.rgb8, fps)
+        if CONFIG["debug"]:
+            cfg.enable_stream(rs.stream.color, w, h, rs.format.rgb8, fps)
+        
         self.pipe = rs.pipeline()
         self.pipe.start(cfg)
         self.pc = rs.pointcloud()
@@ -33,20 +35,18 @@ class CameraNode(Node):
             self.get_logger().warning("no frames from camera (disconnected?)")
             return
 
-        color = frames.get_color_frame()
-        if not color:
-            return
-
-        # 1. video feed
-        if CONFIG["show_window"]:
-            img = np.asanyarray(color.get_data())
-            cv2.imshow("camera", cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
-            cv2.waitKey(1)
+        # 1. video feed (debug only)
+        if CONFIG["debug"]:
+            color = frames.get_color_frame()
+            if color:
+                img = np.asanyarray(color.get_data())
+                cv2.imshow("camera", cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+                cv2.waitKey(1)
 
         # 2. 3D points, at a lower rate
         self.count += 1
         dots = "." * (self.count // 20 % 4)
-        print(f"Streaming camera feed{dots:<3}", end="\r", flush=True)
+        print(f"Streaming 3D points{dots:<3}", end="\r", flush=True)
         if self.count % CONFIG["publish_every"] == 0:
             self.publish(frames)
 
