@@ -11,6 +11,7 @@ from sensor_msgs.msg import PointCloud2
 import matplotlib
 matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 
 
@@ -24,6 +25,9 @@ CONFIG = {
     "scales": [(0.08, 0.30, 60), (0.04, 0.12, 50), (0.02, 0.05, 40)],
 }
 reg = o3d.pipelines.registration
+
+# tip first, in camera axes (x right, y down, z forward); isosceles, 1 long and 0.4 wide
+TRIANGLE = np.array([[0, 0, 2 / 3], [-0.2, 0, -1 / 3], [0.2, 0, -1 / 3]])
 
 
 def to_o3d(msg):
@@ -61,14 +65,20 @@ class PoseNode(Node):
         self.started = False
         self.path = [np.zeros(3)]    # camera positions, starting at the origin
         plt.ion()
-        self.ax = plt.figure("camera path").add_subplot(projection="3d")
+        fig = plt.figure("camera path")
+        self.ax = fig.add_subplot(projection="3d")
+        fig.subplots_adjust(left=0, right=1, bottom=0, top=1)    # no empty margins
+        
+        self.ax.grid(False)    # comment this line out to bring the grid back        
         self.ax.set_xlabel("x (right)")
         self.ax.set_ylabel("y (down)")
         self.ax.set_zlabel("z (forward)")
-        self.ax.set_box_aspect((1, 1, 1))
+        self.ax.set_box_aspect((1, 1, 1), zoom=1.2)
         self.ax.scatter(0, 0, 0, color="black")    # starting position
+        
         self.line, = self.ax.plot([], [], [], color="tab:blue")
-        self.arrow = None
+        self.tri = Poly3DCollection([TRIANGLE * 0.12], color="tab:red")    # current pose
+        self.ax.add_collection3d(self.tri)
         self.create_timer(0.1, self.draw)    # redraw 10 times a second
         threading.Thread(target=self.wait_for_key, daemon=True).start()
 
@@ -76,24 +86,31 @@ class PoseNode(Node):
     def wait_for_key(self):
         input("Waiting for key: place the camera, then press Enter to start\n")
         self.started = True
-        self.get_logger().info("tracking started")
+        self.get_logger().info("tracking started (Enter = pause/resume)")
+        while True:
+            input()
+            self.started = not self.started
+            if self.started:
+                self.tgt = None            # next frame becomes the new reference
+                self.step = np.eye(4)
+                self.get_logger().info("tracking resumed")
+            else:
+                self.get_logger().info("tracking paused")
 
 
     def draw(self):
         p = np.array(self.path)
         self.line.set_data_3d(p[:, 0], p[:, 1], p[:, 2])
 
-        if self.arrow:
-            self.arrow.remove()
-        d = self.pose[:3, :3] @ [0, 0, 1]    # where the camera is pointing
-        self.arrow = self.ax.quiver(*p[-1], *d, length=0.1, normalize=True, color="tab:red")
-
         lim = max(0.5, np.abs(p).max() * 1.1)    # grows when the path leaves the box
         self.ax.set_xlim(-lim, lim)
         self.ax.set_ylim(-lim, lim)
         self.ax.set_zlim(-lim, lim)
-        plt.pause(0.001)
 
+        size = lim / 4    # the triangle scales with the box
+        self.tri.set_verts([(TRIANGLE * size) @ self.pose[:3, :3].T + p[-1]])
+        plt.pause(0.001)
+        
 
     def cb(self, msg):
         if not self.started:
