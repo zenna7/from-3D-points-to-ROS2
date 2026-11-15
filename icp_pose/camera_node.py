@@ -5,7 +5,8 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import PointCloud2, PointField
 
-CONFIG = {"width": 640, "height": 480, "fps": 30, "publish_every": 6}  # 30 fps / 6 = 5 Hz
+
+CONFIG = {"width": 640, "height": 480, "fps": 30, "publish_every": 6, "show_window": False}  # 30 fps / 6 = 5 Hz
 
 
 class CameraNode(Node):
@@ -24,6 +25,7 @@ class CameraNode(Node):
 
         self.create_timer(1 / fps, self.tick)
 
+
     def tick(self):
         try:
             frames = self.pipe.wait_for_frames(1000)
@@ -36,9 +38,10 @@ class CameraNode(Node):
             return
 
         # 1. video feed
-        img = np.asanyarray(color.get_data())
-        cv2.imshow("camera", cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
-        cv2.waitKey(1)
+        if CONFIG["show_window"]:
+            img = np.asanyarray(color.get_data())
+            cv2.imshow("camera", cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+            cv2.waitKey(1)
 
         # 2. 3D points, at a lower rate
         self.count += 1
@@ -46,6 +49,7 @@ class CameraNode(Node):
         print(f"Streaming camera feed{dots:<3}", end="\r", flush=True)
         if self.count % CONFIG["publish_every"] == 0:
             self.publish(frames)
+
 
     def publish(self, frames):
         depth = frames.get_depth_frame()
