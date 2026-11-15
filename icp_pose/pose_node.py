@@ -30,6 +30,11 @@ reg = o3d.pipelines.registration
 TRIANGLE = np.array([[0, 0, 2 / 3], [-0.2, 0, -1 / 3], [0.2, 0, -1 / 3]])
 
 
+def to_plot(a):
+    """camera axes (x right, y down, z forward) -> plot axes (x right, y forward, z up)"""
+    return a[..., [0, 2, 1]] * [1, 1, -1]
+
+
 def to_o3d(msg):
     xyz = np.frombuffer(msg.data, dtype=np.float32).reshape(-1, 3)
     xyz = xyz[xyz[:, 2] < CONFIG["max_depth"]]
@@ -71,8 +76,9 @@ class PoseNode(Node):
         
         self.ax.grid(False)    # comment this line out to bring the grid back        
         self.ax.set_xlabel("x (right)")
-        self.ax.set_ylabel("y (down)")
-        self.ax.set_zlabel("z (forward)")
+        self.ax.set_ylabel("z (forward)")
+        self.ax.set_zlabel("up")
+        self.ax.view_init(elev=20, azim=-70)    # fixed starting view, forward goes into the screen
         self.ax.set_box_aspect((1, 1, 1), zoom=1.2)
         self.ax.scatter(0, 0, 0, color="black")    # starting position
         
@@ -100,7 +106,8 @@ class PoseNode(Node):
 
     def draw(self):
         p = np.array(self.path)
-        self.line.set_data_3d(p[:, 0], p[:, 1], p[:, 2])
+        q = to_plot(p)
+        self.line.set_data_3d(q[:, 0], q[:, 1], q[:, 2])
 
         lim = max(0.5, np.abs(p).max() * 1.1)    # grows when the path leaves the box
         self.ax.set_xlim(-lim, lim)
@@ -108,9 +115,10 @@ class PoseNode(Node):
         self.ax.set_zlim(-lim, lim)
 
         size = lim / 4    # the triangle scales with the box
-        self.tri.set_verts([(TRIANGLE * size) @ self.pose[:3, :3].T + p[-1]])
+        tri = (TRIANGLE * size) @ self.pose[:3, :3].T + p[-1]
+        self.tri.set_verts([to_plot(tri)])
         plt.pause(0.001)
-        
+
 
     def cb(self, msg):
         if not self.started:
