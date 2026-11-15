@@ -29,6 +29,11 @@ reg = o3d.pipelines.registration
 # tip first, in camera axes (x right, y down, z forward); isosceles, 1 long and 0.4 wide
 TRIANGLE = np.array([[0, 0, 2 / 3], [-0.2, 0, -1 / 3], [0.2, 0, -1 / 3]])
 
+# key -> (elevation, azimuth) of the plot view; add a line to add a view
+VIEWS = {
+    "1": (90, -90),    # top down: left/right on x, forward goes up the screen
+}
+
 
 def to_plot(a):
     """camera axes (x right, y down, z forward) -> plot axes (x right, y forward, z up)"""
@@ -73,13 +78,14 @@ class PoseNode(Node):
         fig = plt.figure("camera path")
         self.ax = fig.add_subplot(projection="3d")
         fig.subplots_adjust(left=0, right=1, bottom=0, top=1)    # no empty margins
+        fig.canvas.mpl_connect("key_press_event", self.on_key)
         
         self.ax.grid(False)    # comment this line out to bring the grid back        
-        self.ax.set_xlabel("x (right)")
-        self.ax.set_ylabel("z (forward)")
-        self.ax.set_zlabel("up")
+        self.ax.set_xlabel("x l/r")
+        self.ax.set_ylabel("z f/b")
+        self.ax.set_zlabel("y up/down")
         self.ax.view_init(elev=20, azim=-70)    # fixed starting view, forward goes into the screen
-        self.ax.set_box_aspect((1, 1, 1), zoom=1.2)
+        self.ax.set_box_aspect((1, 1, 1))
         self.ax.scatter(0, 0, 0, color="black")    # starting position
         
         self.line, = self.ax.plot([], [], [], color="tab:blue")
@@ -102,6 +108,12 @@ class PoseNode(Node):
                 self.get_logger().info("tracking resumed")
             else:
                 self.get_logger().info("tracking paused")
+
+
+    def on_key(self, event):
+        if event.key in VIEWS:
+            self.ax.view_init(*VIEWS[event.key])
+            self.ax.figure.canvas.draw_idle()
 
 
     def draw(self):
