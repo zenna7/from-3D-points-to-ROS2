@@ -1,3 +1,4 @@
+# Node 1: reads the RealSense D455 depth stream and publishes the 3D points on the "points" topic
 import cv2
 import numpy as np
 import pyrealsense2 as rs
@@ -6,7 +7,13 @@ from rclpy.node import Node
 from sensor_msgs.msg import PointCloud2, PointField
 
 
-CONFIG = {"width": 640, "height": 480, "fps": 30, "publish_every": 6, "debug": False}  # 30 fps / 6 = 5 Hz
+CONFIG = {
+    "width": 640,
+    "height": 480,
+    "fps": 30,
+    "publish_every": 6,    # one cloud every N frames (30 fps / 6 = 5 Hz)
+    "debug": False,        # True: also stream color and show the video window
+}
 
 
 class CameraNode(Node):
@@ -18,20 +25,21 @@ class CameraNode(Node):
         cfg = rs.config()
         cfg.enable_stream(rs.stream.depth, w, h, rs.format.z16, fps)
         if CONFIG["debug"]:
-            cfg.enable_stream(rs.stream.color, w, h, rs.format.rgb8, fps)
-        
+            cfg.enable_stream(rs.stream.color, w, h, rs.format.rgb8, fps)    # color is only for the debug window
+
         self.pipe = rs.pipeline()
         self.pipe.start(cfg)
-        self.pc = rs.pointcloud()
-        self.count = 0
+        self.pc = rs.pointcloud()    # turns a depth frame into 3D points
+        self.count = 0               # frame counter
 
-        self.create_timer(1 / fps, self.tick)
+        self.create_timer(1 / fps, self.tick)    # tick runs once per camera frame
 
 
     def tick(self):
         try:
-            frames = self.pipe.wait_for_frames(1000)
+            frames = self.pipe.wait_for_frames(1000)    # 1 s timeout
         except RuntimeError:
+            # camera dropped (e.g. USB passthrough): warn and keep running
             self.get_logger().warning("no frames from camera (disconnected?)")
             return
 
@@ -40,12 +48,12 @@ class CameraNode(Node):
             color = frames.get_color_frame()
             if color:
                 img = np.asanyarray(color.get_data())
-                cv2.imshow("camera", cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
-                cv2.waitKey(1)
+                cv2.imshow("camera", cv2.cvtColor(img, cv2.COLOR_RGB2BGR))    # OpenCV expects BGR
+                cv2.waitKey(1)    # needed to refresh the window
 
         # 2. 3D points, at a lower rate
         self.count += 1
-        dots = "." * (self.count // 20 % 4)
+        dots = "." * (self.count // 20 % 4)    # animated dots, 0 to 3
         print(f"Streaming 3D points{dots:<3}", end="\r", flush=True)
         if self.count % CONFIG["publish_every"] == 0:
             self.publish(frames)
@@ -58,8 +66,9 @@ class CameraNode(Node):
 
         pts = self.pc.calculate(depth)
         xyz = np.asanyarray(pts.get_vertices()).view(np.float32).reshape(-1, 3)
-        xyz = xyz[xyz[:, 2] > 0]
+        xyz = xyz[xyz[:, 2] > 0]    # drop pixels with no depth
 
+        # PointCloud2 message: one row of points, 3 float32 (x, y, z) = 12 bytes each
         msg = PointCloud2()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.header.frame_id = "camera"
@@ -74,14 +83,13 @@ class CameraNode(Node):
         self.pub.publish(msg)
 
 
-
 def main():
     rclpy.init()
     node = CameraNode()
     try:
-        rclpy.spin(node)
+        rclpy.spin(node)    # runs until Ctrl+C
     finally:
-        node.pipe.stop()
+        node.pipe.stop()    # release the camera
         cv2.destroyAllWindows()
         rclpy.shutdown()
 
