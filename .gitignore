@@ -1,9 +1,26 @@
-frames/
+# Structure
+frames/*
+!frames/.gitkeep
 initial_test/
-.vscode/
-.DS_Store
+
+# ROS 2 / colcon
 build/
 install/
 log/
+
+# Python
 __pycache__/
+*.pyc
+*.egg-info/
+.venv/
+venv/
+
+# Data and logs
 *.ply
+*.pcd
+*.bag
+*.log
+
+# Editor and OS
+.vscode/
+.DS_Store
