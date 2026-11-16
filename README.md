@@ -245,7 +245,6 @@ Faster hand movements need larger pairing distances at the coarse scales. A slow
 icp_pose/        the two nodes: camera_node.py and pose_node.py
 resource/        ament marker file, needed by ROS 2
 offline/         the original offline reconstruction script 
-initial_test/    test code for the start of the project, useless now
 package.xml      ROS 2 package description
 setup.py         Python package and entry points
 setup.cfg        install paths
