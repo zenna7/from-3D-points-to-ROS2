@@ -12,6 +12,10 @@ setup(
     ],
     install_requires=["setuptools"],
     zip_safe=True,
+    maintainer="Marco",
+    maintainer_email="128093697+zenna7@users.noreply.github.com",
+    description="RealSense point clouds and ICP camera pose estimation",
+    license="MIT",
     entry_points={
         "console_scripts": [
             "camera_node = icp_pose.camera_node:main",

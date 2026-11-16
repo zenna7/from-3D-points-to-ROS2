@@ -1,4 +1,7 @@
-pyrealsense2
-open3d
-scipy
-numpy
+numpy==2.3.5
+scipy==1.18.1
+open3d==0.20.0
+matplotlib==3.10.7
+opencv-python==5.0.0.93
+# pyrealsense2: pip on x86, build from source on ARM64 Linux (see README)
+# tkinter (plot window): sudo apt install python3-tk
